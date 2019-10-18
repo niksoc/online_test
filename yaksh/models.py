@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 import json
 import random
 import ruamel.yaml
+from django.core.exceptions import ValidationError
 from ruamel.yaml.scalarstring import PreservedScalarString
 from ruamel.yaml.comments import CommentedMap
 from random import sample
@@ -1230,10 +1231,6 @@ class Question(models.Model):
     # Number of points for the question.
     points = models.FloatField(default=1.0)
 
-    # The language for question.
-    language = models.CharField(max_length=24,
-                                choices=languages)
-
     # The type of question.
     type = models.CharField(max_length=24, choices=question_types)
 
@@ -1243,9 +1240,6 @@ class Question(models.Model):
 
     # Tags for the Question.
     tags = TaggableManager(blank=True)
-
-    # Snippet of code provided to the user.
-    snippet = models.TextField(blank=True)
 
     # user for particular question
     user = models.ForeignKey(User, related_name="user")
@@ -1261,7 +1255,7 @@ class Question(models.Model):
     # Solution for the question.
     solution = models.TextField(blank=True)
 
-    def consolidate_answer_data(self, user_answer, user=None):
+    def consolidate_answer_data(self, user_answer, user=None, language=None):
         question_data = {}
         metadata = {}
         test_case_data = []
@@ -1274,7 +1268,7 @@ class Question(models.Model):
 
         question_data['test_case_data'] = test_case_data
         metadata['user_answer'] = user_answer
-        metadata['language'] = self.language
+        metadata['language'] = language
         metadata['partial_grading'] = self.partial_grading
         files = FileUpload.objects.filter(question=self)
         if files:
@@ -1463,7 +1457,7 @@ class Question(models.Model):
         self.read_yaml(extract_path, user, files)
 
     def __str__(self):
-        return self.summary
+        return '{}: {}'.format(self.id, self.summary)
 
 
 ###############################################################################
@@ -1505,6 +1499,8 @@ class Answer(models.Model):
     # The question for which user answers.
     question = models.ForeignKey(Question)
 
+    language = models.CharField(choices=languages, max_length=31, blank=True, null=True)
+
     # The answer submitted by the user.
     answer = models.TextField(null=True, blank=True)
 
@@ -1520,6 +1516,10 @@ class Answer(models.Model):
 
     # Whether skipped or not.
     skipped = models.BooleanField(default=False)
+
+    def clean(self):
+        if not self.question.language_options.filter(language=self.language).exists():
+            raise ValidationError('invalid language for question')
 
     def set_marks(self, marks):
         if marks > self.question.points:
@@ -2350,6 +2350,18 @@ class AnswerPaper(models.Model):
         return u'AnswerPaper paper of {0} {1} for quiz {2}'\
                .format(u.first_name, u.last_name, q.description)
 
+
+class LanguageOption(models.Model):
+    # The language for question.
+    language = models.CharField(max_length=24,
+                                choices=languages)
+    # Snippet of code provided to the user.
+    snippet = models.TextField(blank=True)
+
+    question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name='language_options')
+
+    def __str__(self):
+        return "{} [{}]".format(str(self.question)[:30], self.language)
 
 ##############################################################################
 class AssignmentUploadManager(models.Manager):

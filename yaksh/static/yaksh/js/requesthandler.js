@@ -178,7 +178,7 @@ $(document).ready(function(){
   // Initialize the codemirror editor
   global_editor.editor = CodeMirror.fromTextArea(textarea_node, options);
   // Setting code editors initial content
-  global_editor.editor.setValue(init_val);
+  global_editor.editor.setValue(init_val[lang]);
 }
 if (question_type == 'upload' || question_type == 'code') {
   $('#code').submit(function(e) {
@@ -194,8 +194,13 @@ if (question_type == 'upload' || question_type == 'code') {
   });
   }
 
+  on_language_select = function() {
+    lang = event.target.value;
+    reset_editor();
+  }
+
   reset_editor = function() {
-      global_editor.editor.setValue(init_val);
+      global_editor.editor.setValue(init_val[lang]);
       global_editor.editor.clearHistory();
       $('#undo_changes').modal('hide');
   }

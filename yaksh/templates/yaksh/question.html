@@ -26,8 +26,9 @@
 <script src="{{ URL_ROOT }}/static/yaksh/js/mathjax/MathJax.js?config=TeX-MML-AM_CHTML"></script>
 <script src="{{ URL_ROOT }}/static/yaksh/js/jquery-sortable.js"></script>
 <script>
-init_val = '{{ last_attempt|escape_quotes|safe }}';
-lang = "{{ question.language }}"
+lang = "{{ question.language_options.first.language }}"
+init_val = JSON.parse('{{ last_attempt | escape_quotes | safe }}')
+
 course_id = "{{course.id}}"
 module_id = "{{module.id}}"
 is_exercise = "{{ quiz.is_exercise }}"
@@ -102,8 +103,8 @@ function call_skip(url)
     form.action = url
     form.submit();
 }
-init_val = '{{ last_attempt|escape_quotes|safe }}';
-lang = "{{ question.language }}"
+init_val = JSON.parse('{{ last_attempt | escape_quotes | safe }}')
+lang = "{{ question.language_options.first.language }}"
 course_id = "{{course.id}}"
 module_id = "{{module.id}}"
 question_type = "{{ question.type }}"
@@ -274,6 +275,13 @@ question_type = "{{ question.type }}"
 
 
                     {% if question.type == "code" %}
+                      Choose language:
+                      <select id="language_choice" name="language" onchange="on_language_select()">
+                          {% for language_option in question.language_options.all %}
+                          <option value="{{ language_option.language }}">{{ language_option.language }}</option>
+                          {% endfor %}
+                      </select>
+                      warning: changing the language will clear the editor and erase your progress
                       <div class="row align-items-center">
                            <div class="col-md-9">
                                <h5>Write your program below:</h5>

@@ -1,4 +1,4 @@
-from yaksh.models import Question, Quiz, QuestionPaper, Profile
+from yaksh.models import Question, Quiz, QuestionPaper, Profile, LanguageOption
 from yaksh.models import (TestCase, StandardTestCase, StdIOBasedTestCase,
                           Course, AnswerPaper)
 from django.contrib import admin
@@ -23,3 +23,4 @@ admin.site.register(Course)
 admin.site.register(Quiz)
 admin.site.register(QuestionPaper)
 admin.site.register(AnswerPaper, AnswerPaperAdmin)
+admin.site.register(LanguageOption)

@@ -19,7 +19,6 @@
   {% csrf_token %}
   <center><table class="table table-responsive-sm">
   <tr><td>Summary: <td>{{ qform.summary }}{{ qform.summary.errors }}
-  <tr><td> Language: <td> {{qform.language}}{{qform.language.errors}}
   <tr><td> Type: <td> {{ qform.type }}{{qform.type.errors}}
   <tr><td>Points:<td><button class="btn-mini" type="button" onClick="increase(frm);">+</button>{{qform.points }}<button class="btn-mini" type="button" onClick="decrease(frm);">-</button>{{ qform.points.errors }} 
     <tr><td><strong>Rendered: </strong><td><p id='my'></p>

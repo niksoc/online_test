@@ -1,25 +1,28 @@
-import os
 import csv
-from django.http import HttpResponse, JsonResponse
+import json
+import os
+import zipfile
+from textwrap import dedent
+
+import six
 from django.contrib.auth import login, logout, authenticate
-from django.shortcuts import render, get_object_or_404, redirect
-from django.template import Context, Template
-from django.http import Http404
-from django.db.models import Max, Q, F
-from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import Group
-from django.forms.models import inlineformset_factory
-from django.utils import timezone
 from django.core.exceptions import (
     MultipleObjectsReturned, ObjectDoesNotExist
 )
-from taggit.models import Tag
-import json
-import six
-from textwrap import dedent
-import zipfile
+from django.db.models import Max, Q, F
+from django.forms.models import inlineformset_factory
+from django.http import Http404
+from django.http import HttpResponse, JsonResponse
+from django.shortcuts import render, get_object_or_404, redirect
+from django.template import Context, Template
+from django.template.defaultfilters import safe
+from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt
 from markdown import Markdown
+from taggit.models import Tag
+
 try:
     from StringIO import StringIO as string_io
 except ImportError:
@@ -28,13 +31,10 @@ import re
 # Local imports.
 from yaksh.code_server import get_result as get_result_from_code_server
 from yaksh.models import (
-    Answer, AnswerPaper, AssignmentUpload, Course, FileUpload, FloatTestCase,
-    HookTestCase, IntegerTestCase, McqTestCase, Profile,
-    QuestionPaper, QuestionSet, Quiz, Question, StandardTestCase,
-    StdIOBasedTestCase, StringTestCase, TestCase, User,
-    get_model_class, FIXTURES_DIR_PATH, MOD_GROUP_NAME, Lesson, LessonFile,
-    LearningUnit, LearningModule, CourseStatus, question_types
-)
+    Answer, AnswerPaper, AssignmentUpload, Course, FileUpload, Profile,
+    QuestionPaper, QuestionSet, Quiz, Question, TestCase, User,
+    FIXTURES_DIR_PATH, MOD_GROUP_NAME, Lesson, LessonFile,
+    LearningUnit, LearningModule, CourseStatus, LanguageOption, languages)
 from yaksh.forms import (
     UserRegisterForm, UserLoginForm, QuizForm, QuestionForm,
     QuestionFilterForm, CourseForm, ProfileForm,
@@ -171,7 +171,7 @@ def quizlist_user(request, enrolled=None, msg=None):
         courses = Course.objects.filter(
             active=True, is_trial=False
         ).exclude(
-           ~Q(requests=user), ~Q(rejected=user), hidden=True
+            ~Q(requests=user), ~Q(rejected=user), hidden=True
         ).order_by('-id')
         title = 'All Courses'
 
@@ -247,10 +247,18 @@ def add_question(request, question_id=None):
                                             fields='__all__')
             formsets.append(formset(
                 request.POST, request.FILES, instance=question
-                )
             )
+            )
+        formsets.append(
+            inlineformset_factory(
+                Question, LanguageOption, extra=len(languages), fields='__all__'
+            )(
+                request.POST, instance=question
+            )
+        )
         files = request.FILES.getlist('file_field')
         uploaded_files = FileUpload.objects.filter(question_id=question.id)
+
         if qform.is_valid():
             question = qform.save(commit=False)
             question.user = user
@@ -292,6 +300,15 @@ def add_question(request, question_id=None):
                 initial=[{'type': test_case_type}]
             )
         )
+
+    formsets.append(
+        inlineformset_factory(
+            Question, LanguageOption, extra=len(languages), fields='__all__'
+        )(
+            instance=question,
+        )
+    )
+
     context = {'qform': qform, 'fileform': fileform, 'question': question,
                'formsets': formsets, 'uploaded_files': uploaded_files}
     return my_render_to_response(
@@ -461,15 +478,15 @@ def start(request, questionpaper_id=None, attempt_num=None, course_id=None,
     try:
         quest_paper = QuestionPaper.objects.get(id=questionpaper_id)
     except QuestionPaper.DoesNotExist:
-        msg = 'Quiz not found, please contact your '\
-            'instructor/administrator.'
+        msg = 'Quiz not found, please contact your ' \
+              'instructor/administrator.'
         if is_moderator(user):
             return prof_manage(request, msg=msg)
         return view_module(request, module_id=module_id, course_id=course_id,
                            msg=msg)
     if not quest_paper.has_questions():
-        msg = 'Quiz does not have Questions, please contact your '\
-            'instructor/administrator.'
+        msg = 'Quiz does not have Questions, please contact your ' \
+              'instructor/administrator.'
         if is_moderator(user):
             return prof_manage(request, msg=msg)
         return view_module(request, module_id=module_id, course_id=course_id,
@@ -641,6 +658,13 @@ def show_question(request, question, paper, error_message=None,
     course = Course.objects.get(id=course_id)
     module = course.learning_module.get(id=module_id)
     all_modules = course.get_learning_modules()
+    last_attempt = {language_option.language: language_option.snippet
+                    for language_option in question.language_options.all()}
+
+    answers = paper.get_previous_answers(question)
+    for answer in reversed(answers):
+        last_attempt[answer.language] = answer.answer
+
     context = {
         'question': question,
         'paper': paper,
@@ -649,7 +673,7 @@ def show_question(request, question, paper, error_message=None,
         'test_cases': test_cases,
         'files': files,
         'notification': notification,
-        'last_attempt': question.snippet.encode('unicode-escape'),
+        'last_attempt': json.dumps(last_attempt).encode('unicode-escape'),
         'course': course,
         'module': module,
         'can_skip': can_skip,
@@ -657,11 +681,7 @@ def show_question(request, question, paper, error_message=None,
         'quiz_type': quiz_type,
         'all_modules': all_modules,
     }
-    answers = paper.get_previous_answers(question)
-    if answers:
-        last_attempt = answers[0].answer
-        if last_attempt:
-            context['last_attempt'] = last_attempt.encode('unicode-escape')
+
     return my_render_to_response(request, 'yaksh/question.html', context)
 
 
@@ -791,7 +811,7 @@ def check(request, q_id, attempt_num=None, questionpaper_id=None,
                 course_id=course_id, module_id=module_id,
                 previous_question=current_question
             )
-        if current_question in paper.get_questions_answered()\
+        if current_question in paper.get_questions_answered() \
                 and current_question.type not in ['code', 'upload']:
             new_answer = paper.get_latest_answer(current_question.id)
             new_answer.answer = user_answer
@@ -799,6 +819,7 @@ def check(request, q_id, attempt_num=None, questionpaper_id=None,
         else:
             new_answer = Answer(
                 question=current_question, answer=user_answer,
+                language=request.POST['language'],
                 correct=False, error=json.dumps([])
             )
         new_answer.save()
@@ -808,8 +829,8 @@ def check(request, q_id, attempt_num=None, questionpaper_id=None,
         # questions, we obtain the results via XML-RPC with the code executed
         # safely in a separate process (the code_server.py) running as nobody.
         json_data = current_question.consolidate_answer_data(
-            user_answer, user) if current_question.type == 'code' or \
-            current_question.type == 'upload' else None
+            user_answer, user, language=new_answer.language) if current_question.type == 'code' or \
+                                  current_question.type == 'upload' else None
         result = paper.validate_answer(
             user_answer, current_question, json_data, uid
         )
@@ -881,8 +902,8 @@ def _update_paper(request, uid, result):
         new_answer.marks = (current_question.points * result['weight'] /
                             current_question.get_maximum_test_case_weight()) \
             if current_question.partial_grading and \
-            current_question.type == 'code' or \
-            current_question.type == 'upload' else current_question.points
+               current_question.type == 'code' or \
+               current_question.type == 'upload' else current_question.points
         new_answer.correct = result.get('success')
         error_message = None
         new_answer.error = json.dumps(result.get('error'))
@@ -891,16 +912,16 @@ def _update_paper(request, uid, result):
         new_answer.marks = (current_question.points * result['weight'] /
                             current_question.get_maximum_test_case_weight()) \
             if current_question.partial_grading and \
-            current_question.type == 'code' or \
-            current_question.type == 'upload' \
+               current_question.type == 'code' or \
+               current_question.type == 'upload' \
             else 0
         error_message = result.get('error') \
             if current_question.type == 'code' or \
-            current_question.type == 'upload' \
+               current_question.type == 'upload' \
             else None
         new_answer.error = json.dumps(result.get('error'))
         next_question = current_question if current_question.type == 'code' \
-            or current_question.type == 'upload' \
+                                            or current_question.type == 'upload' \
             else paper.add_completed_question(current_question.id)
     new_answer.save()
     paper.update_marks('inprogress')
@@ -930,8 +951,8 @@ def complete(request, reason=None, attempt_num=None, questionpaper_id=None,
     user = request.user
     if questionpaper_id is None:
         message = (
-            reason or "An Unexpected Error occurred."
-            " Please contact your instructor/administrator."
+                reason or "An Unexpected Error occurred."
+                          " Please contact your instructor/administrator."
         )
         context = {'message': message}
         return my_render_to_response(request, 'yaksh/complete.html', context)
@@ -1363,8 +1384,8 @@ def design_questionpaper(request, quiz_id, questionpaper_id=None,
             if question_ids:
                 if question_paper.fixed_question_order:
                     ques_order = (
-                        question_paper.fixed_question_order.split(",") +
-                        question_ids.split(",")
+                            question_paper.fixed_question_order.split(",") +
+                            question_ids.split(",")
                     )
                     questions_order = ",".join(ques_order)
                 else:
@@ -1582,7 +1603,7 @@ def download_quiz_csv(request, course_id, quiz_id):
     response = HttpResponse(content_type='text/csv')
     response['Content-Disposition'] = \
         'attachment; filename="{0}-{1}-attempt{2}.csv"'.format(
-            course.name.replace('.', ''),  quiz.description.replace('.', ''),
+            course.name.replace('.', ''), quiz.description.replace('.', ''),
             attempt_number)
     writer = csv.writer(response)
     if 'questions' in csv_fields:
@@ -1590,19 +1611,19 @@ def download_quiz_csv(request, course_id, quiz_id):
     writer.writerow(csv_fields)
 
     csv_fields_values = {
-            'name': 'user.get_full_name().title()',
-            'roll_number': 'user.profile.roll_number',
-            'institute': 'user.profile.institute',
-            'department': 'user.profile.department',
-            'username': 'user.username',
-            'marks_obtained': 'answerpaper.marks_obtained',
-            'out_of': 'question_paper.total_marks',
-            'percentage': 'answerpaper.percent',
-            'status': 'answerpaper.status'}
+        'name': 'user.get_full_name().title()',
+        'roll_number': 'user.profile.roll_number',
+        'institute': 'user.profile.institute',
+        'department': 'user.profile.department',
+        'username': 'user.username',
+        'marks_obtained': 'answerpaper.marks_obtained',
+        'out_of': 'question_paper.total_marks',
+        'percentage': 'answerpaper.percent',
+        'status': 'answerpaper.status'}
     questions_scores = {}
     for question in questions:
         questions_scores['{0}-{1}'.format(question.summary, question.points)] \
-                = 'answerpaper.get_per_question_score({0})'.format(question.id)
+            = 'answerpaper.get_per_question_score({0})'.format(question.id)
     csv_fields_values.update(questions_scores)
 
     users = users.exclude(id=course.creator.id).exclude(
@@ -1650,8 +1671,8 @@ def grade_user(request, quiz_id=None, user_id=None, attempt_number=None,
             raise Http404('This course does not belong to you')
 
         has_quiz_assignments = AssignmentUpload.objects.filter(
-                                question_paper_id=questionpaper_id
-                                ).exists()
+            question_paper_id=questionpaper_id
+        ).exists()
         context = {
             "users": user_details,
             "quiz_id": quiz_id,
@@ -1669,9 +1690,9 @@ def grade_user(request, quiz_id=None, user_id=None, attempt_number=None,
             except IndexError:
                 raise Http404('No attempts for paper')
             has_user_assignments = AssignmentUpload.objects.filter(
-                                question_paper_id=questionpaper_id,
-                                user_id=user_id
-                                ).exists()
+                question_paper_id=questionpaper_id,
+                user_id=user_id
+            ).exists()
             user = User.objects.get(id=user_id)
             data = AnswerPaper.objects.get_user_data(
                 user, questionpaper_id, course_id, attempt_number
@@ -1871,8 +1892,8 @@ def test_mode(user, godmode=False, questions_list=None, quiz_id=None,
         trial_quiz = Quiz.objects.create_trial_quiz(user)
         trial_questionpaper = QuestionPaper.objects. \
             create_trial_paper_to_test_questions(
-                trial_quiz, questions_list
-            )
+            trial_quiz, questions_list
+        )
         trial_unit, created = LearningUnit.objects.get_or_create(
             order=1, type="quiz", quiz=trial_quiz,
             check_prerequisite=False)
@@ -1887,8 +1908,8 @@ def test_mode(user, godmode=False, questions_list=None, quiz_id=None,
         )
         trial_questionpaper = QuestionPaper.objects. \
             create_trial_paper_to_test_quiz(
-                trial_quiz, quiz_id
-            )
+            trial_quiz, quiz_id
+        )
     return trial_questionpaper, trial_course, module
 
 
@@ -1954,7 +1975,7 @@ def grader(request, extra_context=None):
         raise Http404('You are not allowed to view this page!')
     courses = Course.objects.filter(is_trial=False)
     user_courses = list(courses.filter(creator=user)) + \
-        list(courses.filter(teachers=user))
+                   list(courses.filter(teachers=user))
     context = {'courses': user_courses}
     if extra_context:
         context.update(extra_context)
@@ -2033,9 +2054,9 @@ def download_course_csv(request, course_id):
         student["out_of"] = total_course_marks
     response = HttpResponse(content_type='text/csv')
     response['Content-Disposition'] = 'attachment; filename="{0}.csv"'.format(
-                                      (course.name).lower().replace('.', ''))
-    header = ['first_name', 'last_name', "roll_number", "email", "institute"]\
-        + [quiz.description for quiz in quizzes] + ['total_scored', 'out_of']
+        (course.name).lower().replace('.', ''))
+    header = ['first_name', 'last_name', "roll_number", "email", "institute"] \
+             + [quiz.description for quiz in quizzes] + ['total_scored', 'out_of']
     writer = csv.DictWriter(response, fieldnames=header, extrasaction='ignore')
     writer.writeheader()
     for student in students:
@@ -2076,8 +2097,8 @@ def new_activation(request, email=None):
     try:
         user = User.objects.get(email=email)
     except MultipleObjectsReturned:
-        context['email_err_msg'] = "Multiple entries found for this email"\
-                                    "Please change your email"
+        context['email_err_msg'] = "Multiple entries found for this email" \
+                                   "Please change your email"
         return my_render_to_response(
             request, 'yaksh/activation_status.html', context
         )
@@ -2087,12 +2108,12 @@ def new_activation(request, email=None):
                             Please verify your account"
         return my_render_to_response(
             request, 'yaksh/activation_status.html', context
-            )
+        )
 
     if not user.profile.is_email_verified:
         user.profile.activation_key = generate_activation_key(user.username)
         user.profile.key_expiry_time = timezone.now() + \
-            timezone.timedelta(minutes=20)
+                                       timezone.timedelta(minutes=20)
         user.profile.save()
         new_user_data = User.objects.get(email=email)
         success, msg = send_user_mail(new_user_data.email,
@@ -2147,8 +2168,8 @@ def download_assignment_file(request, quiz_id, course_id,
         folder = f_name.user.get_full_name().replace(" ", "_")
         sub_folder = f_name.assignmentQuestion.summary.replace(" ", "_")
         folder_name = os.sep.join((folder, sub_folder, os.path.basename(
-                        f_name.assignmentFile.name))
-                        )
+            f_name.assignmentFile.name))
+                                  )
         zip_file.write(
             f_name.assignmentFile.path, folder_name
         )
@@ -2156,8 +2177,8 @@ def download_assignment_file(request, quiz_id, course_id,
     zipfile_name.seek(0)
     response = HttpResponse(content_type='application/zip')
     response['Content-Disposition'] = 'attachment; filename={0}.zip'.format(
-                                            file_name.replace(" ", "_")
-                                            )
+        file_name.replace(" ", "_")
+    )
     response.write(zipfile_name.read())
     return response
 
@@ -2199,8 +2220,8 @@ def upload_users(request, course_id):
             field.strip().lower() for field in reader.fieldnames]
         for field in required_fields:
             if field not in stripped_fieldnames:
-                context['message'] = "The CSV file does not contain the"\
-                    " required headers"
+                context['message'] = "The CSV file does not contain the" \
+                                     " required headers"
                 return my_render_to_response(
                     request, 'yaksh/course_detail.html', context
                 )
@@ -2226,7 +2247,7 @@ def _read_user_csv(reader, course):
             if remove.strip().lower() == 'true':
                 _remove_from_course(user, course)
                 upload_details.append("{0} -- {1} -- User rejected".format(
-                                      counter, user.username))
+                    counter, user.username))
             else:
                 _add_to_course(user, course)
                 upload_details.append(
@@ -2247,7 +2268,7 @@ def _read_user_csv(reader, course):
         else:
             state = "Updated"
         upload_details.append("{0} -- {1} -- User {2} Successfully".format(
-                              counter, user.username, state))
+            counter, user.username, state))
     if counter == 0:
         upload_details.append("No rows in the CSV file")
     return upload_details
@@ -2257,8 +2278,8 @@ def _get_csv_values(row, fields):
     roll_no, institute, department = "", "", ""
     remove = "false"
     email, first_name, last_name = map(str.strip, [row['email'],
-                                       row['firstname'],
-                                       row['lastname']])
+                                                   row['firstname'],
+                                                   row['lastname']])
     password = email
     username = email
     if 'password' in fields and row['password']:
@@ -2536,7 +2557,7 @@ def design_module(request, module_id, course_id=None):
 
     added_quiz_lesson = learning_module.get_added_quiz_lesson()
     quizzes = [("quiz", quiz) for quiz in Quiz.objects.filter(
-               creator=user, is_trial=False)]
+        creator=user, is_trial=False)]
     lessons = [("lesson", lesson)
                for lesson in Lesson.objects.filter(creator=user)]
     quiz_les_list = set(quizzes + lessons) - set(added_quiz_lesson)
@@ -2817,7 +2838,7 @@ def course_modules(request, course_id, msg=None):
     context['modules'] = [
         (module, module.get_module_complete_percent(course, user))
         for module in learning_modules
-        ]
+    ]
     if course_status.exists():
         course_status = course_status.first()
         if not course_status.grade:
@@ -2898,7 +2919,7 @@ def get_user_data(request, course_id, student_id):
             """\
             You are neither course creator nor course teacher for {0}
             """.format(course.name)
-            )
+        )
         data['msg'] = msg
         data['status'] = False
     else:
@@ -2908,14 +2929,14 @@ def get_user_data(request, course_id, student_id):
         module_percent = [
             (module, module.get_module_complete_percent(course, student))
             for module in modules
-            ]
+        ]
         data['modules'] = module_percent
         _update_course_percent(course, student)
         data['course_percentage'] = course.get_completion_percent(student)
         data['student'] = student
     template_path = os.path.join(
         os.path.dirname(__file__), "templates", "yaksh", "user_status.html"
-        )
+    )
     with open(template_path) as f:
         template_data = f.read()
         template = Template(template_data)
@@ -2930,7 +2951,7 @@ def download_course(request, course_id):
     user = request.user
     course = get_object_or_404(Course, pk=course_id)
     if (not course.is_creator(user) and not course.is_teacher(user) and not
-            course.is_student(user)):
+    course.is_student(user)):
         raise Http404("You are not allowed to download {0} course".format(
             course.name))
     if not course.has_lessons():
@@ -2950,7 +2971,7 @@ def download_course(request, course_id):
     zip_file.seek(0)
     response = HttpResponse(content_type='application/zip')
     response['Content-Disposition'] = 'attachment; filename={0}.zip'.format(
-                                            course_name
-                                            )
+        course_name
+    )
     response.write(zip_file.read())
     return response
