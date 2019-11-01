@@ -1,4 +1,4 @@
-from yaksh.models import Question, Quiz, QuestionPaper, Profile, LanguageOption
+from yaksh.models import Question, Quiz, QuestionPaper, Profile, LanguageOption, StudentActivityLog
 from yaksh.models import (TestCase, StandardTestCase, StdIOBasedTestCase,
                           Course, AnswerPaper)
 from django.contrib import admin
@@ -14,6 +14,11 @@ class ProfileAdmin(admin.ModelAdmin):
                      "roll_number", "institute", "department"]
 
 
+class StudentActivityLogAdmin(admin.ModelAdmin):
+    list_display = ('module', 'course', 'level', 'student', 'timestamp', 'label', 'value')
+    search_fields = ('type', 'student__first_name', 'student__last_name', 'quiz')
+
+
 admin.site.register(Profile, ProfileAdmin)
 admin.site.register(Question)
 admin.site.register(TestCase)
@@ -24,3 +29,4 @@ admin.site.register(Quiz)
 admin.site.register(QuestionPaper)
 admin.site.register(AnswerPaper, AnswerPaperAdmin)
 admin.site.register(LanguageOption)
+admin.site.register(StudentActivityLog, StudentActivityLogAdmin)

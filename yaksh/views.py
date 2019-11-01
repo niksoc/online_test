@@ -13,6 +13,7 @@ from django.core.exceptions import (
     MultipleObjectsReturned, ObjectDoesNotExist
 )
 from django.db.models import Max, Q, F
+from django.forms import model_to_dict
 from django.forms.models import inlineformset_factory, BaseInlineFormSet
 from django.http import Http404
 from django.http import HttpResponse, JsonResponse
@@ -35,7 +36,7 @@ from yaksh.models import (
     Answer, AnswerPaper, AssignmentUpload, Course, FileUpload, Profile,
     QuestionPaper, QuestionSet, Quiz, Question, TestCase, User,
     FIXTURES_DIR_PATH, MOD_GROUP_NAME, Lesson, LessonFile,
-    LearningUnit, LearningModule, CourseStatus, LanguageOption, languages)
+    LearningUnit, LearningModule, CourseStatus, LanguageOption, languages, StudentActivityLog)
 from yaksh.forms import (
     UserRegisterForm, UserLoginForm, QuizForm, QuestionForm,
     QuestionFilterForm, CourseForm, ProfileForm,
@@ -485,6 +486,31 @@ def user_login(request):
 
     return my_render_to_response(request, 'yaksh/login.html', context)
 
+MAX_LOGS_PER_STUDENT_PER_TYPE = 10
+
+@login_required
+def log_student_activity(request, question_id, course_id, module_id):
+    num_logs_of_type = StudentActivityLog.objects.filter(
+        student=request.user,
+        course=get_object_or_404(Course, id=course_id),
+        module=get_object_or_404(LearningModule, id=module_id),
+        level=request.POST.get('level'),
+    ).count()
+
+    if num_logs_of_type > MAX_LOGS_PER_STUDENT_PER_TYPE:
+        return HttpResponse()
+
+    StudentActivityLog.objects.create(
+        student=request.user,
+        question=get_object_or_404(Question, id=question_id),
+        course=get_object_or_404(Course, id=course_id),
+        module=get_object_or_404(LearningModule, id=module_id),
+        level=request.POST.get('level'),
+        label=request.POST.get('label'),
+        value=request.POST.get('value'),
+    )
+
+    return HttpResponse()
 
 @login_required
 @email_verified
@@ -1685,9 +1711,9 @@ def grade_user(request, quiz_id=None, user_id=None, attempt_number=None,
         )
         quiz = get_object_or_404(Quiz, id=quiz_id)
         course = get_object_or_404(Course, id=course_id)
-        if not course.is_creator(current_user) and not \
-                course.is_teacher(current_user):
-            raise Http404('This course does not belong to you')
+        # if not course.is_creator(current_user) and not \
+        #         course.is_teacher(current_user):
+        #     raise Http404('This course does not belong to you')
 
         has_quiz_assignments = AssignmentUpload.objects.filter(
             question_paper_id=questionpaper_id
@@ -1699,6 +1725,7 @@ def grade_user(request, quiz_id=None, user_id=None, attempt_number=None,
             "has_quiz_assignments": has_quiz_assignments,
             "course_id": course_id
         }
+
         if user_id is not None:
             attempts = AnswerPaper.objects.get_user_all_attempts(
                 questionpaper_id, user_id, course_id
@@ -1716,10 +1743,12 @@ def grade_user(request, quiz_id=None, user_id=None, attempt_number=None,
             data = AnswerPaper.objects.get_user_data(
                 user, questionpaper_id, course_id, attempt_number
             )
+            logs = [model_to_dict(log) for log in StudentActivityLog.objects.filter(student=user, course_id=course_id)]
             context = {
                 "data": data,
                 "quiz_id": quiz_id,
                 "users": user_details,
+                "student_activity_logs": logs,
                 "attempts": attempts,
                 "user_id": user_id,
                 "has_user_assignments": has_user_assignments,

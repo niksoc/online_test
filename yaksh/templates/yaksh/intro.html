@@ -24,6 +24,7 @@
     <div class="yakshwell">
       <p> Welcome <strong>{{user.get_full_name|title}}</strong>, to the programming quiz! </p>
       {{ questionpaper.quiz.instructions|safe }}
+        <div class="alert alert-danger"><strong>Do not leave the browser or switch tabs. Attempts to do so will be monitored and candidates may be disqualified.</strong></div>
       <div class="row yakshwell">
           <div class="col-md-6">
             <center>

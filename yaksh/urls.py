@@ -16,6 +16,8 @@ urlpatterns = [
     url(r'^results/$', views.results_user),
     url(r'^start/(?P<questionpaper_id>\d+)/(?P<module_id>\d+)/'
         '(?P<course_id>\d+)/$', views.start),
+    url(r'^log/(?P<module_id>\d+)/'
+        '(?P<course_id>\d+)/(?P<question_id>\d+)/$', views.log_student_activity),
     url(r'^start/(?P<attempt_num>\d+)/(?P<module_id>\d+)/'
         '(?P<questionpaper_id>\d+)/(?P<course_id>\d+)/$', views.start),
     url(r'^quit/(?P<attempt_num>\d+)/(?P<module_id>\d+)/'

@@ -61,6 +61,10 @@ question_types = (
 
     )
 
+student_activity_log_levels = (
+    ("info", "info"),
+    ("warning", "warning"),)
+
 enrollment_methods = (
     ("default", "Enroll Request"),
     ("open", "Open Enrollment"),
@@ -1939,6 +1943,19 @@ class AnswerPaperManager(models.Manager):
         if papers:
             best_attempt = max([marks["marks_obtained"] for marks in papers])
         return best_attempt
+
+
+class StudentActivityLog(models.Model):
+    """Log student's activity while on quiz, eg. change tab"""
+    student = models.ForeignKey(User, on_delete=models.CASCADE)
+    question = models.ForeignKey(Question)
+    course = models.ForeignKey(Course)
+    module = models.ForeignKey(LearningModule)
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    level = models.CharField(choices=student_activity_log_levels, max_length=31)
+    label = models.CharField(max_length=255, null=True, blank=True)
+    value = models.CharField(max_length=255, null=True, blank=True)
 
 
 ###############################################################################

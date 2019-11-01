@@ -2,6 +2,29 @@ request_status = "initial";
 count = 0;
 MAX_COUNT = 14
 
+function logActivity() {
+console.log("logged")
+        var ajax_post_data = {
+        "method": 'POST',
+        "url": "/exam/log/" + module_id + "/" + course_id + "/" + question_id + "/",
+        "data": {"level": "warning"},
+        "beforeSend": function(xhr, settings) {
+          if (!csrfSafeMethod(settings.type) && !this.crossDomain) {
+              xhr.setRequestHeader("X-CSRFToken", csrftoken);
+          }
+        },
+    }
+    $.ajax(ajax_post_data);
+    alert('Suspicious Activity Detected and Communicated to Moderator!!! Do NOT leave the browser, change tabs etc.')
+}
+
+document.addEventListener("visibilitychange", function() {
+    if (document.visibilityStatus==="hidden")
+        logActivity();
+});
+window.addEventListener("blur", logActivity);
+
+
 function reset_values() {
     request_status = "initial";
     count = 0;
@@ -141,11 +164,13 @@ function ajax_check_code(url, method_type, data_type, data, uid)
 
 }
 
+var csrftoken;
 var global_editor = {};
-var csrftoken = jQuery("[name=csrfmiddlewaretoken]").val();
 var err_lineno;
 var marker;
 $(document).ready(function(){
+  csrftoken = jQuery("[name=csrfmiddlewaretoken]").val();
+
   if(is_exercise == "True" && can_skip == "False"){
       setTimeout(function() {show_solution();}, delay_time*1000);
   }

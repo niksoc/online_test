@@ -31,6 +31,7 @@ init_val = JSON.parse('{{ last_attempt | escape_quotes | safe }}')
 
 course_id = "{{course.id}}"
 module_id = "{{module.id}}"
+question_id = "{{question.id}}"
 is_exercise = "{{ quiz.is_exercise }}"
 can_skip = "{{ can_skip }}"
 delay_time = new Number("{{ delay_time }}")

@@ -85,6 +85,15 @@ $(document).ready(function()
 <p><b>Institute: </b>{{ data.profile.institute }}
 {% endif %}
 
+<hr />
+<h4>Student Activity Logs</h4>
+    <table class="tablesorter table table-striped table-bordered table-responsive-sm">
+        <tr>{% for key in student_activity_logs.0.keys %} <th>{{key}}</th>{% endfor %} </tr>
+    {% for log in student_activity_logs %}
+    <tr>{% for value in log.values %}<th>{{value}}</th>{% endfor %}</tr>
+        {% endfor %}
+    </table>
+
 {% if data.papers %}
 
 {% for paper in data.papers %}
