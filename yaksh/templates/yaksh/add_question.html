@@ -18,11 +18,11 @@
 <form action="{{ URL_ROOT }}/exam/manage/addquestion/{{ question.id }}/" method="post" name=frm onSubmit="return autosubmit();" enctype="multipart/form-data">
   {% csrf_token %}
   <center><table class="table table-responsive-sm">
-  <tr><td>Summary: <td>{{ qform.summary }}{{ qform.summary.errors }}
-  <tr><td> Type: <td> {{ qform.type }}{{qform.type.errors}}
-  <tr><td>Points:<td><button class="btn-mini" type="button" onClick="increase(frm);">+</button>{{qform.points }}<button class="btn-mini" type="button" onClick="decrease(frm);">-</button>{{ qform.points.errors }} 
+      <tr><td>Summary: <td>{{ qform.summary }}<div class="text-danger"> {{ qform.summary.errors }}</div>
+      <tr><td> Type: <td> {{ qform.type }}<div class="text-danger">{{qform.type.errors}}</div>
+      <tr><td>Points:<td><button class="btn-mini" type="button" onClick="increase(frm);">+</button>{{qform.points }}<button class="btn-mini" type="button" onClick="decrease(frm);">-</button><div class="text-danger">{{ qform.points.errors }}</div>
     <tr><td><strong>Rendered: </strong><td><p id='my'></p>
-  <tr><td>Description: <td>{{ qform.description}}  {{qform.description.errors}}
+      <tr><td>Description: <td>{{ qform.description}}<div class="text-danger">{{qform.description.errors}}</div></td>
   <tr><td>Tags: <td>{{ qform.tags }}
   <tr><td><strong>Rendered Solution: </strong><td><p id='rend_solution'></p>
   <tr><td>Solution: <td>{{ qform.solution }}
@@ -43,6 +43,37 @@
   <br>
   {% endfor %}{% endif %}
   </table></center>
+  <hr />
+  <h2>Solution Programming Language Options</h2>
+    <ul>
+        <li>Only for 'code' type questions</li>
+        <li>You cannot repeat a language</li>
+        <li>Leave unused fields blank</li>
+    </ul>
+    <div class="text-danger">{{ language_option_formset.non_form_errors }}</div>
+  <div class="form-group">
+    {{ language_option_formset.management_form }}
+
+    {% for form in language_option_formset %}
+      <div class="link-formset well">
+          {{ form.as_p }}
+      </div>
+    {% endfor %}
+  </div>
+
+  <hr />
+  <h2>Testcases</h2>
+  <p><label for="case_type">Add Test Case:</label> <select id="case_type" name="case_type" onchange="frm.submit()">
+      <option value="" selected="selected">---------</option>
+      <option value="standardtestcase">Standard </option>
+      <option value="stdiobasedtestcase">StdIO </option>
+      <option value="mcqtestcase">MCQ/MCC </option>
+      <option value="hooktestcase">Hook </option>
+      <option value="integertestcase">Integer </option>
+      <option value="stringtestcase"> String </option>
+      <option value="floattestcase"> Float </option>
+      <option value="arrangetestcase">Arrange options </option>
+  </select></p>
   {% for formset in formsets %}
   <div class="form-group">
       {{ formset.management_form }}
@@ -55,17 +86,6 @@
 
   </div>
   {% endfor %}
-  <p><label for="case_type">Add Test Case:</label> <select id="case_type" name="case_type" onchange="frm.submit()">
-      <option value="" selected="selected">---------</option>
-      <option value="standardtestcase">Standard </option>
-      <option value="stdiobasedtestcase">StdIO </option>
-      <option value="mcqtestcase">MCQ/MCC </option>
-      <option value="hooktestcase">Hook </option>
-      <option value="integertestcase">Integer </option>
-      <option value="stringtestcase"> String </option>
-      <option value="floattestcase"> Float </option>
-      <option value="arrangetestcase">Arrange options </option>
-  </select></p>
   <center>
     <button class="btn btn-success" type="submit" name="save_question">Save</button>
     <button class="btn btn-info" type="button" name="button" onClick='location.replace("{{URL_ROOT}}/exam/manage/questions/");'>Back to Questions</button>

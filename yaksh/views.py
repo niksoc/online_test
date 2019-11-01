@@ -5,6 +5,7 @@ import zipfile
 from textwrap import dedent
 
 import six
+from django import forms
 from django.contrib.auth import login, logout, authenticate
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import Group
@@ -12,7 +13,7 @@ from django.core.exceptions import (
     MultipleObjectsReturned, ObjectDoesNotExist
 )
 from django.db.models import Max, Q, F
-from django.forms.models import inlineformset_factory
+from django.forms.models import inlineformset_factory, BaseInlineFormSet
 from django.http import Http404
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render, get_object_or_404, redirect
@@ -205,6 +206,26 @@ def results_user(request):
     return my_render_to_response(request, "yaksh/results_user.html", context)
 
 
+class LanguageOptionInlineFormset(BaseInlineFormSet):
+    def clean(self):
+        """Checks that no two articles have the same title."""
+        if any(self.errors):
+            # Don't bother validating the formset unless each form is valid on its own
+            return
+        selected_languages = []
+        for form in self.forms:
+            if self.can_delete and self._should_delete_form(form):
+                continue
+
+            language = form.cleaned_data.get('language')
+            if not language:
+                continue
+
+            if language in selected_languages:
+                raise forms.ValidationError('Cannot have language options with the same language')
+            selected_languages.append(language)
+
+
 @login_required
 @email_verified
 def add_question(request, question_id=None):
@@ -223,6 +244,14 @@ def add_question(request, question_id=None):
             files = FileUpload.objects.filter(id__in=remove_files_id)
             for file in files:
                 file.remove()
+
+    language_option_formset_factory = inlineformset_factory(
+        Question, LanguageOption, extra=len(languages), fields='__all__', formset=LanguageOptionInlineFormset
+    )
+    if request.method == 'POST':
+        language_option_formset = language_option_formset_factory(request.POST, instance=question)
+    else:
+        language_option_formset = language_option_formset_factory(instance=question)
 
     if request.method == 'POST':
         qform = QuestionForm(request.POST, instance=question)
@@ -249,13 +278,7 @@ def add_question(request, question_id=None):
                 request.POST, request.FILES, instance=question
             )
             )
-        formsets.append(
-            inlineformset_factory(
-                Question, LanguageOption, extra=len(languages), fields='__all__'
-            )(
-                request.POST, instance=question
-            )
-        )
+
         files = request.FILES.getlist('file_field')
         uploaded_files = FileUpload.objects.filter(question_id=question.id)
 
@@ -268,6 +291,8 @@ def add_question(request, question_id=None):
             for formset in formsets:
                 if formset.is_valid():
                     formset.save()
+            if language_option_formset.is_valid():
+                language_option_formset.save()
             test_case_type = request.POST.get('case_type', None)
         else:
             context = {
@@ -275,6 +300,7 @@ def add_question(request, question_id=None):
                 'fileform': fileform,
                 'question': question,
                 'formsets': formsets,
+                'language_option_formset': language_option_formset,
                 'uploaded_files': uploaded_files
             }
             return my_render_to_response(
@@ -301,16 +327,9 @@ def add_question(request, question_id=None):
             )
         )
 
-    formsets.append(
-        inlineformset_factory(
-            Question, LanguageOption, extra=len(languages), fields='__all__'
-        )(
-            instance=question,
-        )
-    )
-
     context = {'qform': qform, 'fileform': fileform, 'question': question,
-               'formsets': formsets, 'uploaded_files': uploaded_files}
+               'formsets': formsets, 'language_option_formset': language_option_formset,
+               'uploaded_files': uploaded_files}
     return my_render_to_response(
         request, "yaksh/add_question.html", context
     )
