@@ -838,7 +838,7 @@ def check(request, q_id, attempt_num=None, questionpaper_id=None,
         else:
             new_answer = Answer(
                 question=current_question, answer=user_answer,
-                language=request.POST['language'],
+                language=request.POST.get('language'),
                 correct=False, error=json.dumps([])
             )
         new_answer.save()
