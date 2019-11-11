@@ -1,9 +1,10 @@
-FROM ubuntu:16.04
+FROM centos:7
 
 MAINTAINER FOSSEE <pythonsupport@fossee.in>
 
-RUN apt-get update && \
-apt-get install git python3-pip libmysqlclient-dev sudo default-jre default-jdk -y 
+RUN yum install git python3-pip mariadb-devel sudo java-1.8.0-openjdk java-1.8.0-openjdk-devel gcc python3-devel gcc-c++ -y
+
+ENV JAVA_HOME /usr/lib/jvm/java-1.8.0-openjdk/
 
 VOLUME /Sites/online_test
 

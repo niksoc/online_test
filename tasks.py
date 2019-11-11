@@ -12,7 +12,7 @@ from yaksh.settings import SERVER_POOL_PORT
 
 SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
 TARGET_CONTAINER_NAME = 'yaksh_code_server'
-SRC_IMAGE_NAME = 'fossee/yaksh_codeserver'
+SRC_IMAGE_NAME = 'yaksh.codeserver'
 CHECK_FILE = 'server_running.txt'
 CHECK_FILE_PATH = os.path.join(SCRIPT_DIR, 'yaksh_data', CHECK_FILE)
 OS_NAME = sys.platform
@@ -108,7 +108,7 @@ def start(ctx, ports=SERVER_POOL_PORT, image=SRC_IMAGE_NAME, unsafe=False,
             ctx.run(cmd)
     else:
         cmd_params = {
-            'ports': ports, 'image': SRC_IMAGE_NAME,
+            'ports': ports, 'image': image,
             'name': TARGET_CONTAINER_NAME,
             'vol_mount': os.path.join(SCRIPT_DIR, 'yaksh_data'),
             'command': 'sh {0}'.format(
@@ -119,7 +119,7 @@ def start(ctx, ports=SERVER_POOL_PORT, image=SRC_IMAGE_NAME, unsafe=False,
             }
 
         remove_check_file(CHECK_FILE_PATH)
-        getimage(ctx, image=SRC_IMAGE_NAME)
+        getimage(ctx, image=image)
 
         print("** Preparing code server **")
         create_dir(os.path.join(SCRIPT_DIR, 'yaksh_data', 'data'))

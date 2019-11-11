@@ -49,6 +49,8 @@ def check_code(pid, job_queue, results):
     """
     while True:
         uid, json_data, user_dir = job_queue.get(True)
+        if 'opt/python/current' in user_dir:  # FIXME: hack for aws ebs where current dir is a symlink
+          user_dir = MY_DIR + '/..' + user_dir.split('yaksh_data')[1]
         results[uid] = dict(status='running', pid=pid, result=None)
         data = json.loads(json_data)
         grader = Grader(user_dir)
