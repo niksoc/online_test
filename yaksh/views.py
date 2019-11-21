@@ -703,12 +703,17 @@ def show_question(request, question, paper, error_message=None,
     course = Course.objects.get(id=course_id)
     module = course.learning_module.get(id=module_id)
     all_modules = course.get_learning_modules()
-    last_attempt = {language_option.language: language_option.snippet
-                    for language_option in question.language_options.all()}
-
     answers = paper.get_previous_answers(question)
-    for answer in reversed(answers):
-        last_attempt[answer.language] = answer.answer
+    if question.type in ['code', 'upload']:
+        last_attempt = {language_option.language: language_option.snippet
+                        for language_option in question.language_options.all()}
+
+        for answer in reversed(answers):
+            last_attempt[answer.language] = answer.answer
+        last_attempt = json.dumps(last_attempt)
+    else:
+        last_attempt = answers.first()
+        last_attempt = last_attempt.answer if last_attempt else ''
 
     context = {
         'question': question,
@@ -718,7 +723,7 @@ def show_question(request, question, paper, error_message=None,
         'test_cases': test_cases,
         'files': files,
         'notification': notification,
-        'last_attempt': json.dumps(last_attempt).encode('unicode-escape'),
+        'last_attempt': last_attempt.encode('unicode-escape'),
         'course': course,
         'module': module,
         'can_skip': can_skip,
