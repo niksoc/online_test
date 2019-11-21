@@ -40,18 +40,18 @@
         </table>
 
       {% elif error.type == 'stdio' %}
-
-        {% if error.given_input %}
-         <table class="table table-borderless table-responsive-sm">
+        {% if error.test_case_data.visible %}
+          {% if error.given_input %}
+            <table class="table table-borderless table-responsive-sm">
           <col width="30%">
             <tr class = "bg-light">
             <td> For given Input value(s):</td>
             <td>{{error.given_input}}</td>
             </tr>
          </table>
-       {% endif %}
+          {% endif %}
 
-        <table class="table table-borderless table-responsive-sm" width="100%" id="stdio">
+          <table class="table table-borderless table-responsive-sm" width="100%" id="stdio">
           <col width="10%">
           <col width="40%">
           <col width="40%">
@@ -62,10 +62,10 @@
           <th><center>User output</center></th>
           <th><center>Status</center></th>
           </tr>
-          {% for expected,user in error.expected_output|zip:error.user_output %}
+          {% for expected,user in error.expected_output|zip:error.user_output|slice:":5" %}
           <td> {{forloop.counter}} </td>
           <td>{{expected|default:""}} </td>
-          <td>{{user|default:""}}</td>
+          <td>{{user|default:""|truncatechars:30}}</td>
           {% if forloop.counter0 in error.error_line_numbers or not expected or not user %}
           <td><span class ="fa fa-times text-warning"/></td>
           {% else %}
@@ -73,15 +73,17 @@
           {% endif %}
           </tr>
           {% endfor %}
+              {% if error.user_output|length > 5 %}<tr><td colspan="4">[...] Output truncated </td></tr>{% endif %}
           </table>
-          <table width="100%" class="table table-borderless table-responsive-sm">
+        {% endif %}
+        <table width="100%" class="table table-borderless table-responsive-sm">
           <col width="10">
           <tr class = "bg-light">
           <td><b>Error:</b></td>
            <td>{{error.error_msg}}</td>
            </tr>
           </table>
-        {% endif %}
+      {% endif %}
         </div>
       </div>
       </div>

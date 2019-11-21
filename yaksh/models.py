@@ -2436,12 +2436,15 @@ class StdIOBasedTestCase(TestCase):
     expected_input = models.TextField(default=None, blank=True, null=True)
     expected_output = models.TextField(default=None)
     weight = models.IntegerField(default=1.0)
+    # will the user be able to see the input and output
+    visible = models.BooleanField(default=False)
 
     def get_field_value(self):
         return {"test_case_type": "stdiobasedtestcase",
                 "expected_output": self.expected_output,
                 "expected_input": self.expected_input,
-                "weight": self.weight}
+                "weight": self.weight,
+                "visible": self.visible,}
 
     def __str__(self):
         return u'StdIO Based Testcase | Exp. Output: {0} | Exp. Input: {1}'.\

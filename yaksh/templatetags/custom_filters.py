@@ -32,7 +32,7 @@ def inprogress(answerpaper):
 
 @register.filter(name='zip')
 def zip_longest_out(a, b):
-    return zip_longest(a, b)
+    return list(zip_longest(a, b))
 
 
 @register.filter(name="file_title")

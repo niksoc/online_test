@@ -99,7 +99,7 @@ class Grader(object):
         self.setup()
         test_case_instances = self.get_evaluator_objects(kwargs)
         with change_dir(self.in_dir):
-            success, error, weight = self.safe_evaluate(test_case_instances)
+            success, error, weight = self.safe_evaluate(test_case_instances, kwargs.get('test_case_data', []))
         self.teardown()
 
         result = {'success': success, 'error': error, 'weight': weight}
@@ -121,7 +121,7 @@ class Grader(object):
             test_case_instances.append(test_case_instance)
         return test_case_instances
 
-    def safe_evaluate(self, test_case_instances):
+    def safe_evaluate(self, test_case_instances, test_case_data=[]):
         """
         Handles code evaluation along with compilation, signal handling
         and Exception handling
@@ -138,7 +138,7 @@ class Grader(object):
         # Do whatever testing needed.
         try:
             # Run evaluator selection registry here
-            for idx, test_case_instance in enumerate(test_case_instances):
+            for idx, (test_case_instance, test_case) in enumerate(zip(test_case_instances, test_case_data)):
                 test_case_success = False
                 test_case_instance.compile_code()
                 eval_result = test_case_instance.check_code()
@@ -146,6 +146,7 @@ class Grader(object):
                 if test_case_success:
                     weight += mark_fraction * test_case_instance.weight
                 else:
+                    err['test_case_data'] = test_case
                     error.append(err)
                 test_case_success_status[idx] = test_case_success
 
